@@ -2,10 +2,9 @@
 
 module EffectZoo.Scenario.CountDown.FusedEffects.Program where
 
-import           Control.Effect
-import           Control.Effect.State
+import           Control.Carrier.State.Strict
 
-program :: (Member (State Int) sig, Carrier sig m, Monad m) => m Int
+program :: Has (State Int) sig m => m Int
 program = do
   n <- get
   if n <= 0

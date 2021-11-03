@@ -1,42 +1,39 @@
-{-# language KindSignatures, TypeOperators, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances, DeriveFunctor, FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 module EffectZoo.Scenario.Reinterpretation.FusedEffects.Zooit where
 
-import           Data.Coerce
-import           Control.Effect
-import           Control.Effect.Carrier
-import           Control.Effect.Sum
+import           Control.Algebra
+import           Control.Monad.IO.Class
+import           Data.Kind
 import           EffectZoo.Scenario.Reinterpretation.FusedEffects.HTTP
 import           EffectZoo.Scenario.Reinterpretation.FusedEffects.Logging
 
-data Zooit (m :: * -> *) k
-  = ListScenarios ( [String] -> k )
-  deriving ( Functor )
+data Zooit (m :: Type -> Type) a where
+  ListScenarios :: Zooit m [String]
 
-listScenarios :: (Member Zooit sig, Carrier sig m) => m [String]
-listScenarios = send (ListScenarios ret)
-
-instance HFunctor Zooit where
-  hmap _ = coerce
-
-instance Effect Zooit where
-  handle state handler (ListScenarios k) = ListScenarios (handler . (<$ state) . k)
+listScenarios :: Has Zooit sig m  => m [String]
+listScenarios = send ListScenarios
+{-# INLINE listScenarios #-}
 
 newtype LoggedHTTPC m a = LoggedHTTPC { runLoggedHTTPC :: m a }
+  deriving (Functor , Applicative , Monad, MonadIO)
 
-instance (Carrier sig m, Effect sig, Monad m, Member Logging sig, Member HTTP sig) => Carrier (Zooit :+: sig) (LoggedHTTPC m) where
-  ret = LoggedHTTPC . ret
-  eff =
-    LoggedHTTPC
-      . handleSum
-          ( eff . handleCoercible )
-          ( \( ListScenarios k ) -> do
-              logMsg "Fetching a list of scenarios"
-              scenarios <- lines <$> httpGET "/scenarios"
-              runLoggedHTTPC (k scenarios)
-          )
+instance Has (HTTP :+: Logging) sig m => Algebra (Zooit :+: sig) (LoggedHTTPC m) where
+  alg hdl sig ctx = LoggedHTTPC $ case sig of
+    (L ListScenarios) -> do
+      logMsg "Fetching a list of scenarios"
+      res <- lines <$> httpGET "/scenarios"
+      pure (res <$ ctx)
+    R other -> alg (runLoggedHTTPC . hdl) other ctx
+  {-# INLINE alg #-}
 
-toLoggedHTTP
-  :: (Effect sig, Carrier sig m, Member Logging sig, Member HTTP sig, Monad m)
-  => Eff (LoggedHTTPC m) a
-  -> m a
-toLoggedHTTP m = runLoggedHTTPC (interpret m)
+toLoggedHTTP :: LoggedHTTPC m a -> m a
+toLoggedHTTP  = runLoggedHTTPC
+{-# INLINE toLoggedHTTP #-}

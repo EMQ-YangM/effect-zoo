@@ -1,14 +1,15 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module EffectZoo.Scenario.BigStack.FusedEffects.Program where
 
-import           Control.Effect
-import           Control.Effect.Reader
-import           Control.Effect.State
+import           Control.Algebra
+import           Control.Carrier.Reader
+import           Control.Carrier.State.Strict
 import           Control.Monad
 
 program
-  :: (Member (Reader Int) sig, Member (State Int) sig, Carrier sig m, Monad m)
+  :: Has (State Int :+: Reader Int) si m
   => m ()
 program = do
   n <- ask

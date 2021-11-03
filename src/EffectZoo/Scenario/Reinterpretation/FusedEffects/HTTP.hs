@@ -1,36 +1,35 @@
-{-# language KindSignatures, FlexibleContexts, DeriveFunctor, TypeOperators, FlexibleInstances, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 module EffectZoo.Scenario.Reinterpretation.FusedEffects.HTTP where
 
-import           Control.Effect
-import           Control.Effect.Carrier
-import           Control.Effect.Sum
-import           Control.Effect.Reader
-import           Data.Coerce
+import           Control.Algebra
+import           Control.Carrier.Reader
+import           Control.Monad.IO.Class
+import           Data.Kind
 
-data HTTP (m :: * -> *) k = GET String ( String -> k)
-  deriving (Functor)
+data HTTP (m :: Type -> Type) a where
+  GET :: String -> HTTP m String
 
-instance Effect HTTP where
-  handle state handler (GET path k) = GET path (handler . (<$ state) . k)
+httpGET :: Has HTTP sig m =>String -> m String
+httpGET = send . GET
+{-# INLINE httpGET #-}
 
-httpGET :: (Carrier sig m, Member HTTP sig) => String -> m String
-httpGET url = send (GET url ret)
+newtype ReaderHTTPC m a = ReaderHTTPC { runReaderHTTPC :: (ReaderC String m) a }
+  deriving (Functor , Applicative , Monad, MonadIO)
 
-instance HFunctor HTTP where
-  hmap _ = coerce
+instance Algebra sig m => Algebra (HTTP :+: sig) (ReaderHTTPC m) where
+  alg hdl sig ctx = ReaderHTTPC $ case sig of
+    L (GET s) -> ReaderC $ \r -> pure (r <$ ctx)
+    R other   -> alg (runReaderHTTPC . hdl) (R other) ctx
+  {-# INLINE alg #-}
 
-newtype ReaderHTTPC m a = ReaderHTTPC { runReaderHTTPC :: m a }
-
-instance (Carrier sig m, Effect sig, Member (Reader String) sig, Monad m) => Carrier (HTTP :+: sig) (ReaderHTTPC m) where
-  ret = ReaderHTTPC . ret
-  eff  =
-    ReaderHTTPC
-      . handleSum
-          ( eff . handleCoercible )
-          ( \( GET _path k ) -> ask >>= runReaderHTTPC . k )
-
-mockResponses
-  :: (Monad m, Carrier sig m, Effect sig, Member (Reader String) sig)
-  => Eff (ReaderHTTPC m) a
-  -> m a
-mockResponses m = runReaderHTTPC (interpret m)
+mockResponses :: String -> ReaderHTTPC m a -> m a
+mockResponses s f = runReader s $ runReaderHTTPC f
+{-# INLINE mockResponses #-}

@@ -1,13 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators    #-}
 
 module EffectZoo.Scenario.FileSizes.FusedEffects.Program where
 
-import           Control.Effect
+import           Control.Algebra
 import           EffectZoo.Scenario.FileSizes.FusedEffects.File
 import           EffectZoo.Scenario.FileSizes.FusedEffects.Logging
 
 program
-  :: (Member File sig, Member Logging sig, Carrier sig m, Monad m)
+  :: Has (File :+: Logging) sig m
   => [FilePath]
   -> m Int
 program files = do
@@ -15,7 +16,7 @@ program files = do
   return (sum sizes)
 
 calculateFileSize
-  :: (Member File sig, Member Logging sig, Carrier sig m, Monad m)
+  :: Has (File :+: Logging) sig m
   => FilePath
   -> m Int
 calculateFileSize path = do
@@ -24,3 +25,4 @@ calculateFileSize path = do
   case msize of
     Nothing   -> 0 <$ logMsg ("Could not calculate the size of " ++ path)
     Just size -> size <$ logMsg (path ++ " is " ++ show size ++ " bytes")
+{-# INLINE calculateFileSize #-}

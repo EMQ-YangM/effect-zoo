@@ -2,9 +2,9 @@
 
 module EffectZoo.Scenario.BigStack.FusedEffects.Main where
 
-import           Control.Effect
-import           Control.Effect.Reader
-import           Control.Effect.State
+import           Control.Algebra
+import           Control.Carrier.Reader
+import           Control.Carrier.State.Strict
 import           Control.Monad
 import           Data.Function
 import           EffectZoo.Scenario.BigStack.FusedEffects.Identity

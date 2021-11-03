@@ -1,8 +1,6 @@
 module EffectZoo.Scenario.CountDown.FusedEffects.Main where
 
-import           Control.Effect
-import           Control.Effect.State
-import           Control.Effect.Void
+import           Control.Carrier.State.Strict
 import           EffectZoo.Scenario.CountDown.FusedEffects.Program
 
 countDown :: Int -> (Int, Int)
