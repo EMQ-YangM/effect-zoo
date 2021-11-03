@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 library('ggplot2')
 options(scipen = 20)
 
